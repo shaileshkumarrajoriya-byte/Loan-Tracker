@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#141414">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Loan Tracker">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Loan & Interest Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bitter:wght@500;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink: #141414;
+    --ink-dark: #000000;
+    --paper: #FBF9F4;
+    --paper-line: #E7E1D3;
+    --brass: #C9A227;
+    --brass-deep: #8A6B14;
+    --brass-light: #F0D488;
+    --accent-blue: #1B3A6B;
+    --paid: #3F7859;
+    --paid-bg: #E4EFE8;
+    --due: #B23B31;
+    --due-bg: #F7E6E3;
+    --warn: #B8860B;
+    --text: #2B2E33;
+    --muted: #6B7280;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background: var(--paper);
+    background-image:
+      radial-gradient(ellipse 900px 460px at 50% -60px, rgba(201,162,39,0.10), transparent 65%),
+      repeating-linear-gradient(135deg, rgba(201,162,39,0.05) 0px, rgba(201,162,39,0.05) 1px, transparent 1px, transparent 26px),
+      repeating-linear-gradient(45deg, rgba(20,20,20,0.025) 0px, rgba(20,20,20,0.025) 1px, transparent 1px, transparent 26px);
+    background-attachment: fixed, fixed, fixed;
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    padding-bottom: 60px;
+  }
+  header{
+    background: linear-gradient(160deg, #1c1c1c 0%, #0a0a0a 70%);
+    color: #fff;
+    padding: 24px 18px 22px;
+    border-bottom: 3px solid var(--brass);
+    box-shadow: 0 3px 0 rgba(0,0,0,0.5), 0 6px 18px rgba(0,0,0,0.35);
+    position: relative;
+  }
+  header::after{
+    content:'';
+    position:absolute; left:0; right:0; bottom:-6px; height:1px;
+    background: linear-gradient(90deg, transparent, var(--brass-light), transparent);
+    opacity:0.6;
+  }
+  header h1{
+    font-family:'Bitter', serif;
+    font-weight:800;
+    font-size: 1.5rem;
+    margin: 0 0 4px;
+    letter-spacing: 0.3px;
+    background: linear-gradient(180deg, #fff 0%, #E8D9B5 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  header p{ margin:0; color: #C9D6E8; font-size: 0.85rem; }
+  .wrap{ max-width: 760px; margin: 0 auto; padding: 0 14px; }
+  .summary{
+    display:grid;
+    grid-template-columns: repeat(3,1fr);
+    gap:10px;
+    margin-top: 16px;
+  }
+  .card{
+    background:#fff;
+    border:1px solid var(--paper-line);
+    border-top: 2px solid var(--brass-light);
+    border-radius: 12px;
+    padding: 13px 10px;
+    box-shadow: 0 2px 4px rgba(20,20,20,0.05), 0 8px 20px rgba(20,20,20,0.07);
+    text-align:center;
+  }
+  .card .num{
+    font-family:'JetBrains Mono', monospace;
+    font-weight:700;
+    font-size: 1.2rem;
+    color: var(--ink);
+  }
+  .card .lbl{ font-size: 0.66rem; color: var(--muted); margin-top:2px; }
+  .card.due .num{ color: var(--due); }
+  .card.paid .num{ color: var(--paid); }
+  .card.warn .num{ color: var(--warn); }
+
+  .tabs{ display:flex; gap:6px; margin: 18px 0 12px; overflow-x:auto; }
+  .tab{
+    padding:8px 14px;
+    border-radius: 20px;
+    background:#fff;
+    border:1px solid var(--paper-line);
+    color: var(--muted);
+    font-size:0.85rem;
+    font-weight:600;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .tab.active{ background: linear-gradient(160deg, #262626, #0a0a0a); color:#fff; border-color:var(--ink); box-shadow: 0 2px 6px rgba(0,0,0,0.25); }
+
+  .fee-toggle{ display:flex; gap:6px; margin: 14px 0 8px; }
+  .fee-toggle-btn{
+    flex:1; padding:8px 10px; border-radius:10px; background:#fff;
+    border:1px solid var(--paper-line); color:var(--muted);
+    font-size:0.8rem; font-weight:600; cursor:pointer;
+  }
+  .fee-toggle-btn.active{
+    background: linear-gradient(160deg, #262626, #0a0a0a);
+    color:#fff; border-color:var(--ink);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  }
+
+  .section-title{
+    font-family:'Bitter',serif;
+    font-weight:700;
+    font-size:1.05rem;
+    color: var(--ink-dark);
+    margin: 18px 0 8px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+  .btn{
+    background: linear-gradient(160deg, #D8B84A 0%, var(--brass) 45%, var(--brass-deep) 100%);
+    color:#fff;
+    border:none;
+    padding:9px 14px;
+    border-radius:9px;
+    font-weight:600;
+    font-size:0.85rem;
+    cursor:pointer;
+    box-shadow: 0 1px 2px rgba(138,107,20,0.4), inset 0 1px 0 rgba(255,255,255,0.3);
+    letter-spacing:0.2px;
+  }
+  .btn.secondary{ background:#fff; color:var(--ink); border:1px solid var(--ink); }
+  .btn.ghost{ background:transparent; color:var(--due); padding:4px 8px; font-size:0.78rem; }
+  .btn.wa{ background: #25D366; flex:1; }
+  .btn.sms{ background: var(--ink); flex:1; }
+  .btn:focus-visible, .tab:focus-visible, input:focus-visible, select:focus-visible{
+    outline: 3px solid var(--brass); outline-offset:1px;
+  }
+
+  form.inline{ display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+  form.inline input, form.inline select{ flex:1; min-width:120px; }
+  input, select, textarea{
+    padding:9px 10px;
+    border-radius:8px;
+    border:1px solid var(--paper-line);
+    font-family:'Inter',sans-serif;
+    font-size:0.9rem;
+    background:#fff;
+  }
+
+  .item-card{
+    background:#fff;
+    border:1px solid var(--paper-line);
+    border-left: 4px solid var(--brass);
+    border-radius:10px;
+    padding:14px;
+    margin-bottom:12px;
+    box-shadow: 0 2px 6px rgba(31,58,95,0.06);
+  }
+  .item-card.overdue{ border-left-color: var(--due); }
+  .item-card.closed{ border-left-color: var(--paid); opacity:0.75; }
+  .item-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+  .item-name{ font-family:'Bitter',serif; font-weight:700; font-size:1.02rem; color: var(--ink-dark); }
+  .item-meta{ font-size:0.78rem; color:var(--muted); margin-top:2px; line-height:1.6; }
+  .badge{
+    font-family:'JetBrains Mono',monospace;
+    font-weight:700; font-size:0.72rem;
+    padding:3px 8px; border-radius:6px; white-space:nowrap;
+  }
+  .badge.paid{ background:var(--paid-bg); color:var(--paid); }
+  .badge.due{ background:var(--due-bg); color:var(--due); }
+  .badge.type{ background:var(--brass-light); color:var(--ink-dark); }
+
+  .actions-row{ display:flex; gap:10px; margin-top:10px; flex-wrap:wrap; }
+  .empty{ text-align:center; color:var(--muted); padding:30px 10px; font-size:0.9rem; }
+  .empty b{ color: var(--ink); }
+  .toast{
+    position:fixed; bottom:18px; left:50%; transform:translateX(-50%);
+    background: var(--ink-dark); color:#fff; padding:10px 18px;
+    border-radius:8px; font-size:0.85rem; opacity:0; pointer-events:none;
+    transition: opacity 0.25s; z-index:50;
+  }
+  .toast.show{ opacity:1; }
+  .modal-bg{
+    position:fixed; inset:0; background:rgba(20,40,66,0.5);
+    display:none; align-items:flex-end; justify-content:center; z-index:40;
+  }
+  .modal-bg.show{ display:flex; }
+  .modal{
+    background:#fff; width:100%; max-width:520px;
+    border-radius: 16px 16px 0 0;
+    padding:20px; max-height:88vh; overflow-y:auto;
+  }
+  .modal h3{ font-family:'Bitter',serif; margin-top:0; color:var(--ink-dark); }
+  .field{ margin-bottom:10px; }
+  .field label{ display:block; font-size:0.78rem; color:var(--muted); margin-bottom:4px; }
+  .field input, .field select, .field textarea{ width:100%; }
+  .modal-actions{ display:flex; gap:10px; margin-top:16px; }
+  .modal-actions .btn{ flex:1; }
+
+  table.schedule{ width:100%; border-collapse:collapse; font-size:0.78rem; }
+  table.schedule th{ padding:7px 5px; border-bottom:2px solid var(--paper-line); text-align:left; white-space:nowrap; }
+  table.schedule td{ padding:7px 5px; border-bottom:1px solid var(--paper-line); white-space:nowrap; }
+  table.schedule tr.paid-row td{ color: var(--paid); }
+  table.schedule tr.due-row td.status-cell{ color: var(--due); font-weight:700; }
+
+  /* ============ Desktop view ============
+     On phones (default styles above), the app is a normal full-width page.
+     On wider screens, use the extra space properly instead of staying
+     phone-width. */
+  @media (min-width: 820px){
+    .wrap{ max-width: 1100px; }
+    header > div{ max-width: 1100px; margin: 0 auto; }
+    .modal-bg{ align-items:center; }
+  }
+</style>
+</head>
+<body>
+
+<div style="display:flex; justify-content:flex-end; gap:8px; padding:10px 14px 0;">
+  <button id="installBtn" aria-label="Install App" style="display:none;background:var(--paper-line);border:none;color:var(--ink-dark);width:34px;height:34px;border-radius:50%;font-size:1rem;cursor:pointer;">⬇</button>
+  <button id="settingsBtn" aria-label="Settings" style="background:var(--paper-line);border:none;color:var(--ink-dark);width:34px;height:34px;border-radius:50%;font-size:1rem;cursor:pointer;">⚙</button>
+</div>
+<h1 id="businessName" style="display:none;">My Loans Tracker</h1>
+<p id="businessGst" style="display:none;">Loans I've taken — repayment & interest, all in one place</p>
+
+<div class="wrap">
+  <div class="summary" id="summaryCards" style="grid-template-columns:repeat(2,1fr);margin-top:10px;"></div>
+
+  <div class="fee-toggle" id="interestToggle">
+    <button class="fee-toggle-btn active" data-range="monthly" type="button">This Month</button>
+    <button class="fee-toggle-btn" data-range="yearly" type="button">This Year</button>
+  </div>
+  <div class="summary" id="interestSummaryCards" style="grid-template-columns:repeat(2,1fr);"></div>
+
+  <div class="tabs" id="tabs">
+    <div class="tab active" data-tab="loans">Loans</div>
+    <div class="tab" data-tab="summary">Summary</div>
+  </div>
+
+  <div id="loansPanel">
+    <div class="section-title">
+      Loans
+      <button class="btn" id="addLoanBtn">+ Add Loan Taken</button>
+    </div>
+    <form class="inline">
+      <select id="filterStatus">
+        <option value="active">Active Loans</option>
+        <option value="closed">Closed Loans</option>
+        <option value="all">All Loans</option>
+      </select>
+    </form>
+    <div id="loanList"></div>
+  </div>
+
+  <div id="summaryPanel" style="display:none;">
+    <div class="section-title">
+      Overall Summary
+      <button class="btn" id="exportExcelBtn">⬇ Export to Excel</button>
+    </div>
+    <div id="overallSummaryCards" class="summary" style="grid-template-columns:repeat(2,1fr);margin-top:0;margin-bottom:16px;"></div>
+    <div class="section-title" style="font-size:0.95rem;">All Lenders</div>
+    <div style="overflow-x:auto;">
+      <table class="schedule">
+        <thead><tr><th>Lender</th><th>Loan Amount</th><th>Type</th><th>Outstanding</th><th>Status</th></tr></thead>
+        <tbody id="lendersTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="loanModalBg">
+  <div class="modal">
+    <h3 id="loanModalTitle">Add Loan Taken</h3>
+    <input type="hidden" id="editLoanId">
+    <div class="field"><label>Lender Name (Person / Company)</label><input type="text" id="lName" required></div>
+    <div class="field"><label>Phone Number</label><input type="tel" id="lPhone"></div>
+    <div class="field"><label>Address (optional)</label><input type="text" id="lAddress"></div>
+    <div class="field"><label>Loan Amount Taken (₹)</label><input type="number" id="lPrincipal" min="0"></div>
+    <div class="field"><label>Interest Rate (% per annum)</label><input type="number" id="lRate" min="0" step="0.1"></div>
+    <div class="field">
+      <label>Interest Type</label>
+      <div style="display:flex; gap:10px;">
+        <label style="display:flex;align-items:center;gap:6px;font-size:0.9rem;font-weight:normal;">
+          <input type="radio" name="lType" value="simple" id="lTypeSimple" checked> Simple Interest
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:0.9rem;font-weight:normal;">
+          <input type="radio" name="lType" value="emi" id="lTypeEmi"> EMI (Reducing Balance)
+        </label>
+      </div>
+    </div>
+    <div class="field"><label>Date Taken</label><input type="date" id="lStartDate"></div>
+    <div class="field" id="tenureField" style="display:none;">
+      <label>Tenure (months)</label>
+      <input type="number" id="lTenure" min="1">
+    </div>
+    <div class="field"><label>Note (optional)</label><input type="text" id="lNote" placeholder="e.g. purpose of loan"></div>
+    <div class="modal-actions">
+      <button class="btn secondary" id="cancelLoanBtn" type="button">Cancel</button>
+      <button class="btn" id="saveLoanBtn" type="button">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="paymentModalBg">
+  <div class="modal">
+    <h3>Record Payment (Paid by You)</h3>
+    <input type="hidden" id="paymentLoanId">
+    <div class="field"><label>Amount Paid (₹)</label><input type="number" id="paymentAmount" min="0"></div>
+    <div class="field"><label>Date</label><input type="date" id="paymentDate"></div>
+    <div class="field"><label>Note (optional)</label><input type="text" id="paymentNote"></div>
+    <div class="modal-actions">
+      <button class="btn secondary" id="cancelPaymentBtn" type="button">Cancel</button>
+      <button class="btn" id="savePaymentBtn" type="button">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="historyModalBg">
+  <div class="modal">
+    <h3>Payment History</h3>
+    <div id="historyList"></div>
+    <div class="modal-actions">
+      <button class="btn" id="closeHistoryBtn" type="button">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="scheduleModalBg">
+  <div class="modal" style="max-width:640px;">
+    <h3 id="scheduleModalTitle">EMI Schedule</h3>
+    <div id="scheduleSummaryCards" class="summary" style="margin-top:0;margin-bottom:14px;"></div>
+    <div style="overflow-x:auto;">
+      <table class="schedule">
+        <thead>
+          <tr><th>#</th><th>Due Date</th><th>EMI ₹</th><th>Principal</th><th>Interest</th><th>Balance</th><th>Status</th></tr>
+        </thead>
+        <tbody id="scheduleTableBody"></tbody>
+      </table>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="closeScheduleBtn" type="button">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="settingsModalBg">
+  <div class="modal">
+    <h3>Business Settings</h3>
+    <div class="field"><label>Your Name / Business Name</label><input type="text" id="bizName" placeholder="e.g. Your name"></div>
+    <div class="field"><label>Phone Number(s)</label><input type="text" id="bizPhone" placeholder="e.g. 7036407670"></div>
+    <div class="modal-actions">
+      <button class="btn secondary" id="cancelSettingsBtn" type="button">Cancel</button>
+      <button class="btn" id="saveSettingsBtn" type="button">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="installModalBg">
+  <div class="modal">
+    <h3>Install App</h3>
+    <p style="font-size:0.88rem;color:var(--text);line-height:1.6;">
+      Is file ko is tarah Home Screen par add karein:<br><br>
+      <b>Android (Chrome):</b> Upar-right corner mein <b>⋮</b> (teen dot) menu par tap karein, phir <b>"Add to Home screen"</b> ya <b>"Install app"</b> choose karein.<br><br>
+      <b>iPhone (Safari):</b> Neeche Share icon <b>⬆</b> par tap karein, phir <b>"Add to Home Screen"</b> choose karein.
+    </p>
+    <div class="modal-actions">
+      <button class="btn" id="closeInstallBtn" type="button">Got it</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let state = {
+  loans: [],
+  business: { name: '', phone: '' }
+};
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 1800);
+}
+
+// Storage: this app's own data lives under 'loanData' in the same Firebase
+// project used by the other apps, so it doesn't clash with any of them.
+const FIREBASE_DB_URL = 'https://van-register-default-rtdb.asia-southeast1.firebasedatabase.app';
+const STORAGE_KEY = 'loanData';
+
+const localAdapter = {
+  async get(key){
+    const raw = localStorage.getItem(key);
+    if(raw === null || raw === undefined) return null;
+    return { key, value: raw };
+  },
+  async set(key, value){
+    localStorage.setItem(key, value);
+    return { key, value };
+  }
+};
+const firebaseAdapter = {
+  async get(key){
+    try{
+      const res = await fetch(`${FIREBASE_DB_URL}/${key}.json`);
+      if(!res.ok) throw new Error('fetch failed');
+      const data = await res.json();
+      if(!data || !data.value) return await localAdapter.get(key);
+      try{ localStorage.setItem(key, data.value); }catch(e){}
+      return { key, value: data.value };
+    }catch(e){
+      console.log('Firebase unreachable, using local copy:', e);
+      return await localAdapter.get(key);
+    }
+  },
+  async set(key, value){
+    try{ localStorage.setItem(key, value); }catch(e){}
+    try{
+      const res = await fetch(`${FIREBASE_DB_URL}/${key}.json`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value })
+      });
+      if(!res.ok) throw new Error('save failed');
+      return { key, value };
+    }catch(e){
+      console.log('Firebase save failed, saved locally only:', e);
+      return { key, value };
+    }
+  }
+};
+const storageAdapter = firebaseAdapter;
+
+async function loadState(){
+  try{
+    const res = await storageAdapter.get(STORAGE_KEY);
+    if(res && res.value){
+      state = JSON.parse(res.value);
+      state.loans = state.loans || [];
+      state.business = state.business || { name: '', phone: '' };
+    }
+  }catch(e){
+    console.log('No existing data yet, starting fresh.');
+  }
+  render();
+}
+
+async function saveState(){
+  try{
+    const result = await storageAdapter.set(STORAGE_KEY, JSON.stringify(state));
+    if(!result){ showToast('⚠️ Could not save, please try again'); }
+  }catch(e){
+    console.error(e);
+    showToast('⚠️ There was a problem saving');
+  }
+}
+
+function cleanPhone(phone){
+  if(!phone) return '';
+  let digits = String(phone).replace(/[^0-9]/g, '');
+  if(digits.length === 10) digits = '91' + digits;
+  return digits;
+}
+
+function renderBusinessInfo(){
+  const nameEl = document.getElementById('businessName');
+  const gstEl = document.getElementById('businessGst');
+  nameEl.textContent = 'Loan & Interest Tracker';
+  gstEl.textContent = 'Money lent, interest, and EMI — all in one place';
+}
+
+// ---------- Interest / EMI math ----------
+function yearsBetween(startDate, endDate){
+  const ms = endDate.getTime() - startDate.getTime();
+  return Math.max(0, ms / (1000 * 60 * 60 * 24 * 365));
+}
+
+function simpleInterestAccrued(loan, asOf){
+  asOf = asOf || new Date();
+  const start = new Date(loan.startDate);
+  const years = yearsBetween(start, asOf);
+  return Number(loan.principal||0) * (Number(loan.rate||0)/100) * years;
+}
+
+function totalPayments(loan){
+  return (loan.payments||[]).reduce((sum,p)=>sum + Number(p.amount||0), 0);
+}
+
+function outstandingSimple(loan){
+  const total = Number(loan.principal||0) + simpleInterestAccrued(loan);
+  return Math.max(0, total - totalPayments(loan));
+}
+
+// Allocates each payment on a simple-interest loan to interest-first, then
+// principal — same convention lenders use — so we can report exactly how
+// much interest vs principal has been paid, and when.
+function simpleAllocation(loan){
+  const payments = [...(loan.payments||[])].sort((a,b)=> new Date(a.date) - new Date(b.date));
+  let balance = Number(loan.principal||0);
+  let lastDate = new Date(loan.startDate);
+  let unpaidInterest = 0;
+  const ledger = [];
+  payments.forEach(p=>{
+    const payDate = new Date(p.date);
+    const yrs = yearsBetween(lastDate, payDate);
+    unpaidInterest += balance * (Number(loan.rate||0)/100) * yrs;
+    let amt = Number(p.amount||0);
+    const interestPortion = Math.min(amt, unpaidInterest);
+    unpaidInterest -= interestPortion;
+    amt -= interestPortion;
+    const principalPortion = Math.min(amt, balance);
+    balance -= principalPortion;
+    ledger.push({ date: p.date, amount: Number(p.amount||0), interestPortion, principalPortion });
+    lastDate = payDate;
+  });
+  return { ledger, balanceRemaining: balance, unpaidInterest };
+}
+
+function totalInterestPaid(loan){
+  if(loan.type === 'emi'){
+    return (loan.emiSchedule||[]).filter(i=>i.paid).reduce((s,i)=>s + Number(i.interestComp||0), 0);
+  }
+  return simpleAllocation(loan).ledger.reduce((s,e)=>s + e.interestPortion, 0);
+}
+
+function totalPrincipalPaid(loan){
+  if(loan.type === 'emi'){
+    return (loan.emiSchedule||[]).filter(i=>i.paid).reduce((s,i)=>s + Number(i.principalComp||0), 0);
+  }
+  return simpleAllocation(loan).ledger.reduce((s,e)=>s + e.principalPortion, 0);
+}
+
+// Interest actually paid within a date range (used for Monthly/Yearly reports)
+function interestPaidBetween(loan, fromDate, toDate){
+  if(loan.type === 'emi'){
+    return (loan.emiSchedule||[])
+      .filter(i=>i.paid)
+      .filter(i=>{ const d = new Date(i.paidDate || i.dueDate); return d >= fromDate && d <= toDate; })
+      .reduce((s,i)=>s + Number(i.interestComp||0), 0);
+  }
+  return simpleAllocation(loan).ledger
+    .filter(e=>{ const d = new Date(e.date); return d >= fromDate && d <= toDate; })
+    .reduce((s,e)=>s + e.interestPortion, 0);
+}
+
+function amountPaidBetween(loan, fromDate, toDate){
+  if(loan.type === 'emi'){
+    return (loan.emiSchedule||[])
+      .filter(i=>i.paid)
+      .filter(i=>{ const d = new Date(i.paidDate || i.dueDate); return d >= fromDate && d <= toDate; })
+      .reduce((s,i)=>s + Number(i.emi||0), 0);
+  }
+  return (loan.payments||[])
+    .filter(p=>{ const d = new Date(p.date); return d >= fromDate && d <= toDate; })
+    .reduce((s,p)=>s + Number(p.amount||0), 0);
+}
+
+function calculateEMI(principal, annualRatePct, tenureMonths){
+  const r = (Number(annualRatePct)||0) / 12 / 100;
+  const n = Number(tenureMonths) || 1;
+  if(r === 0) return principal / n;
+  const factor = Math.pow(1+r, n);
+  return principal * r * factor / (factor - 1);
+}
+
+function generateEmiSchedule(loan){
+  const principal = Number(loan.principal||0);
+  const r = (Number(loan.rate||0)) / 12 / 100;
+  const n = Number(loan.tenureMonths) || 1;
+  const emi = calculateEMI(principal, loan.rate, n);
+  let balance = principal;
+  const schedule = [];
+  const start = new Date(loan.startDate);
+  for(let m=1; m<=n; m++){
+    const interestComp = balance * r;
+    let principalComp = emi - interestComp;
+    if(m === n) principalComp = balance; // clear any rounding remainder on the last installment
+    balance = Math.max(0, balance - principalComp);
+    const dueDate = new Date(start);
+    dueDate.setMonth(dueDate.getMonth() + m);
+    schedule.push({
+      month: m,
+      dueDate: dueDate.toISOString().slice(0,10),
+      emi: Math.round((principalComp + interestComp) * 100) / 100,
+      principalComp: Math.round(principalComp * 100) / 100,
+      interestComp: Math.round(interestComp * 100) / 100,
+      balance: Math.round(balance * 100) / 100,
+      paid: false,
+      paidDate: ''
+    });
+  }
+  return schedule;
+}
+
+function outstandingEmi(loan){
+  return (loan.emiSchedule||[]).filter(i=>!i.paid).reduce((sum,i)=>sum + Number(i.emi||0), 0);
+}
+
+function nextDueInstallment(loan){
+  return (loan.emiSchedule||[]).find(i=>!i.paid);
+}
+
+function isLoanFullyClosed(loan){
+  if(loan.type === 'emi'){
+    return (loan.emiSchedule||[]).every(i=>i.paid);
+  }
+  return outstandingSimple(loan) <= 0.5;
+}
+
+// ---------- Summary ----------
+function renderSummary(){
+  let totalLent = 0, totalOutstanding = 0, totalPaid = 0, activeCount = 0;
+  state.loans.forEach(l=>{
+    totalLent += Number(l.principal||0);
+    const out = l.type === 'emi' ? outstandingEmi(l) : outstandingSimple(l);
+    totalOutstanding += out;
+    totalPaid += (totalPrincipalPaid(l) + totalInterestPaid(l));
+    if(!l.closed && out > 0.5) activeCount++;
+  });
+  document.getElementById('summaryCards').innerHTML = `
+    <div class="card"><div class="num">₹${Math.round(totalLent)}</div><div class="lbl">Total Borrowed</div></div>
+    <div class="card paid"><div class="num">₹${Math.round(totalPaid)}</div><div class="lbl">Total Paid So Far</div></div>
+    <div class="card due"><div class="num">₹${Math.round(totalOutstanding)}</div><div class="lbl">Total Outstanding (You Owe)</div></div>
+    <div class="card"><div class="num">${activeCount}</div><div class="lbl">Active Loans</div></div>
+  `;
+}
+
+// ---------- Interest Paid Summary (Monthly / Yearly) ----------
+let interestSummaryRange = 'monthly';
+
+function renderInterestSummary(){
+  const now = new Date();
+  let fromDate, toDate, periodLabel;
+  if(interestSummaryRange === 'monthly'){
+    fromDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    toDate = new Date(now.getFullYear(), now.getMonth()+1, 0, 23, 59, 59);
+    periodLabel = now.toLocaleString('en-IN', { month:'long', year:'numeric' });
+  } else {
+    fromDate = new Date(now.getFullYear(), 0, 1);
+    toDate = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
+    periodLabel = String(now.getFullYear());
+  }
+  let interestPaid = 0, amountPaid = 0;
+  state.loans.forEach(l=>{
+    interestPaid += interestPaidBetween(l, fromDate, toDate);
+    amountPaid += amountPaidBetween(l, fromDate, toDate);
+  });
+  document.getElementById('interestSummaryCards').innerHTML = `
+    <div class="card due"><div class="num">₹${Math.round(interestPaid)}</div><div class="lbl">Interest Paid (${periodLabel})</div></div>
+    <div class="card paid"><div class="num">₹${Math.round(amountPaid)}</div><div class="lbl">Total Paid (${periodLabel})</div></div>
+  `;
+}
+
+document.getElementById('interestToggle').addEventListener('click', (e)=>{
+  const btn = e.target.closest('.fee-toggle-btn');
+  if(!btn) return;
+  interestSummaryRange = btn.dataset.range;
+  document.querySelectorAll('#interestToggle .fee-toggle-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderInterestSummary();
+});
+
+// ---------- Loans list ----------
+function renderLoans(){
+  const filter = document.getElementById('filterStatus').value;
+  let list = [...state.loans];
+  if(filter === 'active') list = list.filter(l=>!isLoanFullyClosed(l));
+  else if(filter === 'closed') list = list.filter(l=>isLoanFullyClosed(l));
+
+  if(list.length === 0){
+    document.getElementById('loanList').innerHTML = `<div class="empty">No loans found.<br>Tap <b>"+ Add Loan Taken"</b> to add one.</div>`;
+    return;
+  }
+
+  document.getElementById('loanList').innerHTML = list.map(l=>{
+    const closed = isLoanFullyClosed(l);
+    let outstanding, extraLine;
+    const interestPaid = totalInterestPaid(l);
+    const principalPaid = totalPrincipalPaid(l);
+    if(l.type === 'emi'){
+      outstanding = outstandingEmi(l);
+      const next = nextDueInstallment(l);
+      const paidCount = (l.emiSchedule||[]).filter(i=>i.paid).length;
+      extraLine = `EMI: ₹${Math.round(calculateEMI(l.principal, l.rate, l.tenureMonths))}/month · Installments: ${paidCount}/${l.tenureMonths}` +
+        (next ? `<br>Next Due: ${next.dueDate}` : '') +
+        `<br>Paid so far: ₹${Math.round(principalPaid + interestPaid)} (Principal ₹${Math.round(principalPaid)} + Interest ₹${Math.round(interestPaid)})`;
+    } else {
+      const accrued = simpleInterestAccrued(l);
+      outstanding = outstandingSimple(l);
+      extraLine = `Interest accrued: ₹${Math.round(accrued)} (as of today)<br>Paid so far: ₹${Math.round(totalPayments(l))} (Principal ₹${Math.round(principalPaid)} + Interest ₹${Math.round(interestPaid)})`;
+    }
+    const overdueClass = (!closed && l.type==='emi' && nextDueInstallment(l) && new Date(nextDueInstallment(l).dueDate) < new Date()) ? 'overdue' : '';
+    return `
+    <div class="item-card ${closed ? 'closed' : overdueClass}">
+      <div class="item-top">
+        <div style="flex:1;">
+          <div class="item-name">${l.lenderName} <span class="badge type">${l.type==='emi' ? 'EMI' : 'Simple'}</span></div>
+          <div class="item-meta">Loan Amount: ₹${l.principal} · Rate: ${l.rate}% p.a. · Taken: ${l.startDate}<br>${extraLine}</div>
+        </div>
+        <span class="badge ${closed ? 'paid' : 'due'}">${closed ? 'CLOSED' : 'You Owe: ₹'+Math.round(outstanding)}</span>
+      </div>
+      <div class="actions-row">
+        <button class="btn secondary" onclick="openEditLoan('${l.id}')">Edit</button>
+        <button class="btn ghost" onclick="deleteLoan('${l.id}')">Delete</button>
+      </div>
+      <div class="actions-row">
+        ${l.phone ? `<a class="btn secondary" style="text-align:center;flex:1;text-decoration:none;" href="tel:${l.phone}">📞 Call</a>` : ''}
+        <button class="btn wa" onclick="sendLoanWhatsApp('${l.id}')">🟢 WhatsApp</button>
+        <button class="btn sms" onclick="sendLoanSMS('${l.id}')">✉️ SMS</button>
+      </div>
+      <div class="actions-row">
+        ${l.type === 'emi'
+          ? `<button class="btn" onclick="openSchedule('${l.id}')" style="flex:1;">📅 View Schedule</button>`
+          : `<button class="btn" onclick="openPaymentModal('${l.id}')" style="flex:1;">💰 Record Payment</button>
+             <button class="btn secondary" onclick="openHistory('${l.id}')" style="flex:1;">📜 History</button>`
+        }
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ---------- New/Edit loan ----------
+document.getElementById('lTypeSimple').addEventListener('change', toggleTenureField);
+document.getElementById('lTypeEmi').addEventListener('change', toggleTenureField);
+function toggleTenureField(){
+  document.getElementById('tenureField').style.display = document.getElementById('lTypeEmi').checked ? 'block' : 'none';
+}
+
+function openNewLoan(){
+  document.getElementById('loanModalTitle').textContent = 'Add Loan Taken';
+  document.getElementById('editLoanId').value = '';
+  document.getElementById('lName').value = '';
+  document.getElementById('lPhone').value = '';
+  document.getElementById('lAddress').value = '';
+  document.getElementById('lPrincipal').value = '';
+  document.getElementById('lRate').value = '';
+  document.getElementById('lTypeSimple').checked = true;
+  document.getElementById('lStartDate').value = new Date().toISOString().slice(0,10);
+  document.getElementById('lTenure').value = '';
+  document.getElementById('lNote').value = '';
+  toggleTenureField();
+  document.getElementById('loanModalBg').classList.add('show');
+}
+
+function openEditLoan(id){
+  const l = state.loans.find(l=>l.id===id);
+  if(!l) return;
+  document.getElementById('loanModalTitle').textContent = 'Edit Loan';
+  document.getElementById('editLoanId').value = id;
+  document.getElementById('lName').value = l.lenderName||'';
+  document.getElementById('lPhone').value = l.phone||'';
+  document.getElementById('lAddress').value = l.address||'';
+  document.getElementById('lPrincipal').value = l.principal||'';
+  document.getElementById('lRate').value = l.rate||'';
+  document.getElementById('lTypeSimple').checked = l.type !== 'emi';
+  document.getElementById('lTypeEmi').checked = l.type === 'emi';
+  document.getElementById('lStartDate').value = l.startDate||'';
+  document.getElementById('lTenure').value = l.tenureMonths||'';
+  document.getElementById('lNote').value = l.note||'';
+  toggleTenureField();
+  document.getElementById('loanModalBg').classList.add('show');
+}
+
+function closeLoanModal(){
+  document.getElementById('loanModalBg').classList.remove('show');
+}
+
+function saveLoan(){
+  const lenderName = document.getElementById('lName').value.trim();
+  if(!lenderName){ showToast('Please enter the lender name'); return; }
+  const principal = Number(document.getElementById('lPrincipal').value) || 0;
+  if(principal <= 0){ showToast('Please enter a valid principal amount'); return; }
+  const type = document.getElementById('lTypeEmi').checked ? 'emi' : 'simple';
+  const tenureMonths = Number(document.getElementById('lTenure').value) || 0;
+  if(type === 'emi' && tenureMonths <= 0){ showToast('Please enter a valid tenure in months'); return; }
+
+  const id = document.getElementById('editLoanId').value;
+  const data = {
+    lenderName,
+    phone: document.getElementById('lPhone').value.trim(),
+    address: document.getElementById('lAddress').value.trim(),
+    principal,
+    rate: Number(document.getElementById('lRate').value) || 0,
+    type,
+    startDate: document.getElementById('lStartDate').value,
+    tenureMonths: type === 'emi' ? tenureMonths : 0,
+    note: document.getElementById('lNote').value.trim()
+  };
+
+  if(id){
+    const idx = state.loans.findIndex(l=>l.id===id);
+    const existing = state.loans[idx];
+    const merged = { ...existing, ...data };
+    if(type === 'emi'){
+      const termsChanged = existing.principal !== data.principal || existing.rate !== data.rate ||
+        existing.tenureMonths !== data.tenureMonths || existing.startDate !== data.startDate || existing.type !== 'emi';
+      if(termsChanged) merged.emiSchedule = generateEmiSchedule(merged);
+    } else {
+      merged.payments = existing.payments || [];
+    }
+    state.loans[idx] = merged;
+  } else {
+    const loan = { id: 'loan_'+Date.now(), ...data, payments: [], closed: false };
+    if(type === 'emi') loan.emiSchedule = generateEmiSchedule(loan);
+    state.loans.push(loan);
+  }
+  saveState();
+  closeLoanModal();
+  render();
+  showToast('✓ Saved');
+}
+
+function deleteLoan(id){
+  if(!confirm('Delete this loan record? This cannot be undone.')) return;
+  state.loans = state.loans.filter(l=>l.id!==id);
+  saveState();
+  render();
+}
+
+// ---------- Simple interest payments ----------
+function openPaymentModal(loanId){
+  document.getElementById('paymentLoanId').value = loanId;
+  document.getElementById('paymentAmount').value = '';
+  document.getElementById('paymentDate').value = new Date().toISOString().slice(0,10);
+  document.getElementById('paymentNote').value = '';
+  document.getElementById('paymentModalBg').classList.add('show');
+}
+function closePaymentModal(){
+  document.getElementById('paymentModalBg').classList.remove('show');
+}
+function saveLoanPayment(){
+  const loanId = document.getElementById('paymentLoanId').value;
+  const amount = Number(document.getElementById('paymentAmount').value) || 0;
+  if(amount <= 0){ showToast('Please enter a valid amount'); return; }
+  const loan = state.loans.find(l=>l.id===loanId);
+  if(!loan) return;
+  loan.payments = loan.payments || [];
+  loan.payments.push({
+    id: 'pay_'+Date.now(),
+    date: document.getElementById('paymentDate').value,
+    amount,
+    note: document.getElementById('paymentNote').value.trim()
+  });
+  saveState();
+  closePaymentModal();
+  render();
+  showToast('✓ Payment recorded');
+}
+
+function openHistory(loanId){
+  const loan = state.loans.find(l=>l.id===loanId);
+  if(!loan) return;
+  const payments = [...(loan.payments||[])].sort((a,b)=> a.date < b.date ? 1 : -1);
+  document.getElementById('historyList').innerHTML = payments.length
+    ? payments.map(p=>`<div class="item-meta" style="margin-bottom:6px;">${p.date} — ₹${p.amount}${p.note ? ' ('+p.note+')' : ''}</div>`).join('')
+    : '<div class="empty">No payments recorded yet.</div>';
+  document.getElementById('historyModalBg').classList.add('show');
+}
+
+// ---------- EMI schedule ----------
+function openSchedule(loanId){
+  const loan = state.loans.find(l=>l.id===loanId);
+  if(!loan) return;
+  document.getElementById('scheduleModalTitle').textContent = loan.lenderName + "'s EMI Schedule";
+  const paidCount = loan.emiSchedule.filter(i=>i.paid).length;
+  const outstanding = outstandingEmi(loan);
+  document.getElementById('scheduleSummaryCards').innerHTML = `
+    <div class="card paid"><div class="num">${paidCount}/${loan.tenureMonths}</div><div class="lbl">Paid</div></div>
+    <div class="card due"><div class="num">₹${Math.round(outstanding)}</div><div class="lbl">Outstanding</div></div>
+    <div class="card"><div class="num">₹${Math.round(calculateEMI(loan.principal, loan.rate, loan.tenureMonths))}</div><div class="lbl">EMI/month</div></div>
+  `;
+  document.getElementById('scheduleTableBody').innerHTML = loan.emiSchedule.map(inst=>{
+    const overdue = !inst.paid && new Date(inst.dueDate) < new Date();
+    return `<tr class="${inst.paid ? 'paid-row' : (overdue ? 'due-row' : '')}">
+      <td>${inst.month}</td>
+      <td>${inst.dueDate}</td>
+      <td>₹${inst.emi}</td>
+      <td>₹${inst.principalComp}</td>
+      <td>₹${inst.interestComp}</td>
+      <td>₹${inst.balance}</td>
+      <td class="status-cell"><button class="btn ${inst.paid ? 'secondary' : ''}" style="padding:4px 10px;font-size:0.75rem;" onclick="toggleInstallment('${loan.id}',${inst.month})">${inst.paid ? '✓ Paid' : 'Mark Paid'}</button></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('scheduleModalBg').classList.add('show');
+}
+
+function toggleInstallment(loanId, month){
+  const loan = state.loans.find(l=>l.id===loanId);
+  if(!loan) return;
+  const inst = loan.emiSchedule.find(i=>i.month===month);
+  if(!inst) return;
+  inst.paid = !inst.paid;
+  inst.paidDate = inst.paid ? new Date().toISOString().slice(0,10) : '';
+  saveState();
+  openSchedule(loanId);
+  render();
+}
+
+function closeScheduleModal(){
+  document.getElementById('scheduleModalBg').classList.remove('show');
+}
+
+// ---------- Messaging ----------
+function buildLoanMessage(l){
+  const bizLine = state.business.name ? `${state.business.name}\n` : '';
+  if(l.type === 'emi'){
+    const next = nextDueInstallment(l);
+    if(!next) return `${bizLine}Hello ${l.lenderName}, my loan of ₹${l.principal} has been fully repaid. Thank you for your support.`;
+    return `${bizLine}Hello ${l.lenderName}, this is to update you that my next EMI of ₹${next.emi} (installment #${next.month}) is due on ${next.dueDate}. I'll pay it on time.`;
+  }
+  const outstanding = outstandingSimple(l);
+  if(outstanding <= 0.5) return `${bizLine}Hello ${l.lenderName}, my loan of ₹${l.principal} has been fully repaid with interest. Thank you.`;
+  return `${bizLine}Hello ${l.lenderName}, updating you that my outstanding balance on the loan of ₹${l.principal} (taken on ${l.startDate} at ${l.rate}% p.a.) is currently ₹${Math.round(outstanding)} including interest. I'll clear it soon.`;
+}
+function sendLoanWhatsApp(loanId){
+  const l = state.loans.find(l=>l.id===loanId);
+  if(!l || !l.phone){ showToast('Please add a phone number first'); return; }
+  const phone = cleanPhone(l.phone);
+  const msg = encodeURIComponent(buildLoanMessage(l));
+  window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
+}
+function sendLoanSMS(loanId){
+  const l = state.loans.find(l=>l.id===loanId);
+  if(!l || !l.phone){ showToast('Please add a phone number first'); return; }
+  const msg = encodeURIComponent(buildLoanMessage(l));
+  window.location.href = `sms:${l.phone}?body=${msg}`;
+}
+
+// ---------- Summary tab ----------
+function renderSummaryTab(){
+  let totalLent = 0, totalOutstanding = 0, totalInterest = 0, totalInterestPaidAll = 0;
+  state.loans.forEach(l=>{
+    totalLent += Number(l.principal||0);
+    totalInterestPaidAll += totalInterestPaid(l);
+    if(l.type === 'emi'){
+      totalOutstanding += outstandingEmi(l);
+      const totalPayable = (l.emiSchedule||[]).reduce((s,i)=>s+i.emi, 0);
+      totalInterest += (totalPayable - Number(l.principal||0));
+    } else {
+      const accrued = simpleInterestAccrued(l);
+      totalInterest += accrued;
+      totalOutstanding += outstandingSimple(l);
+    }
+  });
+  document.getElementById('overallSummaryCards').innerHTML = `
+    <div class="card"><div class="num">₹${Math.round(totalLent)}</div><div class="lbl">Total Borrowed</div></div>
+    <div class="card paid"><div class="num">₹${Math.round(totalInterestPaidAll)}</div><div class="lbl">Interest Paid So Far</div></div>
+    <div class="card"><div class="num">₹${Math.round(totalInterest)}</div><div class="lbl">Total Interest (Full Loan)</div></div>
+    <div class="card due"><div class="num">₹${Math.round(totalOutstanding)}</div><div class="lbl">Outstanding</div></div>
+  `;
+
+  document.getElementById('lendersTableBody').innerHTML = state.loans.map(l=>{
+    const closed = isLoanFullyClosed(l);
+    const outstanding = l.type === 'emi' ? outstandingEmi(l) : outstandingSimple(l);
+    return `<tr>
+      <td>${l.lenderName}</td>
+      <td>₹${l.principal}</td>
+      <td>${l.type === 'emi' ? 'EMI' : 'Simple'}</td>
+      <td>₹${Math.round(outstanding)}</td>
+      <td style="color:${closed ? 'var(--paid)' : 'var(--due)'};font-weight:600;">${closed ? 'Closed' : 'Active'}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:16px;">No loans yet.</td></tr>';
+}
+
+function exportToExcel(){
+  if(typeof XLSX === 'undefined'){ showToast('⚠️ Excel library not loaded, check your internet connection'); return; }
+  const rows = state.loans.map(l=>{
+    const outstanding = l.type === 'emi' ? outstandingEmi(l) : outstandingSimple(l);
+    return {
+      'Lender': l.lenderName,
+      'Phone': l.phone || '',
+      'Loan Amount (₹)': l.principal,
+      'Rate (% p.a.)': l.rate,
+      'Type': l.type === 'emi' ? 'EMI' : 'Simple',
+      'Date Taken': l.startDate,
+      'Tenure (months)': l.tenureMonths || '',
+      'Principal Paid (₹)': Math.round(totalPrincipalPaid(l)),
+      'Interest Paid (₹)': Math.round(totalInterestPaid(l)),
+      'Outstanding / You Owe (₹)': Math.round(outstanding),
+      'Status': isLoanFullyClosed(l) ? 'Closed' : 'Active',
+      'Note': l.note || ''
+    };
+  });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Loans');
+  XLSX.writeFile(wb, 'My_Loans_Tracker.xlsx');
+  showToast('✅ Excel file downloaded');
+}
+
+// ---------- Render everything ----------
+function render(){
+  renderBusinessInfo();
+  renderSummary();
+  renderInterestSummary();
+  renderLoans();
+}
+
+// ---------- Tabs ----------
+document.getElementById('tabs').addEventListener('click', (e)=>{
+  const tab = e.target.closest('.tab');
+  if(!tab) return;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  tab.classList.add('active');
+  const which = tab.dataset.tab;
+  document.getElementById('loansPanel').style.display = which==='loans' ? 'block' : 'none';
+  document.getElementById('summaryPanel').style.display = which==='summary' ? 'block' : 'none';
+  if(which==='summary') renderSummaryTab();
+});
+
+// ---------- Event listeners ----------
+document.getElementById('addLoanBtn').addEventListener('click', openNewLoan);
+document.getElementById('cancelLoanBtn').addEventListener('click', closeLoanModal);
+document.getElementById('saveLoanBtn').addEventListener('click', saveLoan);
+document.getElementById('filterStatus').addEventListener('change', renderLoans);
+
+document.getElementById('cancelPaymentBtn').addEventListener('click', closePaymentModal);
+document.getElementById('savePaymentBtn').addEventListener('click', saveLoanPayment);
+document.getElementById('closeHistoryBtn').addEventListener('click', ()=>{
+  document.getElementById('historyModalBg').classList.remove('show');
+});
+document.getElementById('closeScheduleBtn').addEventListener('click', closeScheduleModal);
+document.getElementById('exportExcelBtn').addEventListener('click', exportToExcel);
+
+// ---------- Settings ----------
+document.getElementById('settingsBtn').addEventListener('click', ()=>{
+  document.getElementById('bizName').value = state.business.name || '';
+  document.getElementById('bizPhone').value = state.business.phone || '';
+  document.getElementById('settingsModalBg').classList.add('show');
+});
+document.getElementById('cancelSettingsBtn').addEventListener('click', ()=>{
+  document.getElementById('settingsModalBg').classList.remove('show');
+});
+document.getElementById('saveSettingsBtn').addEventListener('click', ()=>{
+  state.business.name = document.getElementById('bizName').value.trim();
+  state.business.phone = document.getElementById('bizPhone').value.trim();
+  saveState();
+  renderBusinessInfo();
+  document.getElementById('settingsModalBg').classList.remove('show');
+  showToast('✓ Settings saved');
+});
+
+// --- Add to Home Screen (PWA install) ---
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('./sw.js').catch(e=>console.log('Service worker registration failed:', e));
+}
+
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e)=>{
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  document.getElementById('installBtn').style.display = 'flex';
+  document.getElementById('installBtn').style.alignItems = 'center';
+  document.getElementById('installBtn').style.justifyContent = 'center';
+});
+window.addEventListener('appinstalled', ()=>{
+  document.getElementById('installBtn').style.display = 'none';
+  showToast('✅ App installed');
+});
+const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+if(!isStandalone){
+  setTimeout(()=>{
+    if(document.getElementById('installBtn').style.display === 'none'){
+      document.getElementById('installBtn').style.display = 'flex';
+      document.getElementById('installBtn').style.alignItems = 'center';
+      document.getElementById('installBtn').style.justifyContent = 'center';
+    }
+  }, 800);
+}
+document.getElementById('installBtn').addEventListener('click', async ()=>{
+  if(deferredInstallPrompt){
+    deferredInstallPrompt.prompt();
+    const choice = await deferredInstallPrompt.userChoice;
+    if(choice.outcome === 'accepted'){ showToast('✅ Installing app'); }
+    deferredInstallPrompt = null;
+  } else {
+    document.getElementById('installModalBg').classList.add('show');
+  }
+});
+document.getElementById('closeInstallBtn').addEventListener('click', ()=>{
+  document.getElementById('installModalBg').classList.remove('show');
+});
+
+
+// When embedded inside Business Suite's iframe, the firm's name/GST/phone
+// is already shown once in the shell header — hide the duplicate here.
+if(window.self !== window.top){
+  const nameEl = document.getElementById('businessName');
+  const gstEl = document.getElementById('businessGst');
+  if(nameEl) nameEl.style.display = 'none';
+  if(gstEl) gstEl.style.display = 'none';
+}
+
+loadState();
+</script>
+</body>
+</html>
